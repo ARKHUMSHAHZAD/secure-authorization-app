@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Auth Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1, h2, h3 {
+            color: #333;
+        }
+
+        p {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        code {
+            display: block;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secure Auth Project Documentation</h1>
+        <h2>Introduction</h2>
+        <p>The Secure Auth project is a web application that demonstrates a secure user authentication system using Node.js, Express, MongoDB, and JSON Web Tokens (JWT). This documentation provides an overview of the project's features, their implementation, and how other developers can implement similar features in their own projects.</p>
+
+        <h2 id="project-setup">1. Project Setup</h2>
+        <p>First, set up the project directory and initialize a new Node.js project:</p>
+        <code>
+            mkdir secure-auth-app<br>
+            cd secure-auth-app<br>
+            npm init -y
+        </code>
+        <p>Install the necessary packages:</p>
+        <code>
+            npm install express mongoose dotenv bcryptjs jsonwebtoken
+        </code>
+        <p>Create the following directory structure:</p>
+        <code>
+            secure-auth-app/<br>
+            │<br>
+            ├── models/<br>
+            │   └── user.js<br>
+            │<br>
+            ├── routes/<br>
+            │   └── auth.js<br>
+            │<br>
+            ├── public/<br>
+            │   ├── index.html<br>
+            │   ├── login.html<br>
+            │   └── register.html<br>
+            │<br>
+            ├── .env<br>
+            ├── server.js<br>
+            ├── README.md<br>
+            └── package.json
+        </code>
+
+        <h2 id="backend-implementation">2. Backend Implementation</h2>
+        <h3 id="server-setup">2.1 Server Setup</h3>
+        <p>Create the <code>server.js</code> file to set up the Express server and connect to MongoDB:</p>
+        <code>
+            // server.js<br>
+            const express = require('express');<br>
+            const mongoose = require('mongoose');<br>
+            const dotenv = require('dotenv');<br>
+            const authRoutes = require('./routes/auth');<br><br>
+
+            dotenv.config();<br><br>
+
+            const app = express();<br><br>
+
+            app.use(express.json());<br>
+            app.use(express.static('public'));<br><br>
+
+            mongoose.connect(process.env.MONGO_URI, {<br>
+                useNewUrlParser: true,<br>
+                useUnifiedTopology: true,<br>
+            })<br>
+            .then(() => console.log('MongoDB connected'))<br>
+            .catch(err => console.log(err));<br><br>
+
+            app.use('/api/auth', authRoutes);<br><br>
+
+            const PORT = process.env.PORT || 5000;<br>
+            app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+        </code>
+
+        <h3 id="user-model">2.2 User Model</h3>
+        <p>Create the <code>user.js</code> file in the <code>models</code> directory to define the User schema:</p>
+        <code>
+            // models/user.js<br>
+            const mongoose = require('mongoose');<br><br>
+
+            const UserSchema = new mongoose.Schema({<br>
+                username: {<br>
+                    type: String,<br>
+                    required: true,<br>
+                    unique: true,<br>
+                },<br>
+                password: {<br>
+                    type: String,<br>
+                    required: true,<br>
+                },<br>
+            });<br><br>
+
+            module.exports = mongoose.model('User', UserSchema);
+        </code>
+
+        <h3 id="authentication-routes">2.3 Authentication Routes</h3>
+        <p>Create the <code>auth.js</code> file in the <code>routes</code> directory to handle user registration and login:</p>
+        <code>
+            // routes/auth.js<br>
+            const express = require('express');<br>
+            const bcrypt = require('bcryptjs');<br>
+            const jwt = require('jsonwebtoken');<br>
+            const User = require('../models/user');<br>
+            const router = express.Router();<br><br>
+
+            // Register route<br>
+            router.post('/register', async (req, res) => {<br>
+                const { username, password } = req.body;<br>
+                try {<br>
+                    const salt = await bcrypt.genSalt(10);<br>
+                    const hashedPassword = await bcrypt.hash(password, salt);<br><br>
+
+                    const newUser = new User({ username, password: hashedPassword });<br>
+                    await newUser.save();<br>
+                    res.status(201).json({ msg: 'User registered successfully' });<br>
+                } catch (error) {<br>
+                    res.status(500).json({ msg: 'Error registering user' });<br>
+                }<br>
+            });<br><br>
+
+            // Login route<br>
+            router.post('/login', async (req, res) => {<br>
+                const { username, password } = req.body;<br>
+                try {<br>
+                    const user = await User.findOne({ username });<br>
+                    if (!user) {<br>
+                        return res.status(400).json({ msg: 'Invalid credentials' });<br>
+                    }<br><br>
+
+                    const isMatch = await bcrypt.compare(password, user.password);<br>
+                    if (!isMatch) {<br>
+                        return res.status(400).json({ msg: 'Invalid credentials' });<br>
+                    }<br><br>
+
+                    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });<br>
+                    res.json({ token });<br>
+                } catch (error) {<br>
+                    res.status(500).json({ msg: 'Error logging in' });<br>
+                }<br>
+            });<br><br>
+
+            module.exports = router;
+        </code>
+
+        <h2 id="frontend-implementation">3. Frontend Implementation</h2>
+        <h3 id="login-page">3.1 Login Page</h3>
+        <p>Here is the HTML structure for the login page:</p>
+        <code>
+            &lt;!DOCTYPE html&gt;<br>
+            &lt;html lang="en"&gt;<br>
+            &lt;head&gt;<br>
+                &lt;meta charset="UTF-8"&gt;<br>
+                &lt;title&gt;Login&lt;/title&gt;<br>
+                &lt;style&gt;<br>
+                    /* Add your CSS styling here */<br>
+                &lt;/style&gt;<br>
+            &lt;/head&gt;<br>
+            &lt;body&gt;<br>
+                &lt;div class="container"&gt;<br>
+                    &lt;h1&gt;Login&lt;/h1&gt;<br>
+                    &lt;form id="loginForm"&gt;<br>
+                        &lt;label for="username"&gt;Username:&lt;/label&gt;<br>
+                        &lt;input type="text" id="username" name="username" required&gt;<br>
+                        &lt;br&gt;<br>
+                        &lt;label for="password"&gt;Password:&lt;/label&gt;<br>
+                        &lt;input type="password" id="password" name="password" required&gt;<br>
+                        &lt;br&gt;<br>
+                        &lt;button type="submit"&gt;Login&lt;/button&gt;<br>
+                        &lt;div id="error" class="error"&gt;&lt;/div&gt;<br>
+                    &lt;/form&gt;<br>
+                &lt;/div&gt;<br>
+                &lt;script&gt;<br>
+                    document.getElementById('loginForm').addEventListener('submit', async (e) => {<br>
+                        e.preventDefault();<br>
+                        const username = document.getElementById('username').value;<br>
+                        const password = document.getElementById('password').value;<br><br>
+
+                        const res = await fetch('/api/auth/login', {<br>
+                            method: 'POST',<br>
+                            headers: { 'Content-Type': 'application/json' },<br>
+                            body: JSON.stringify({ username, password }),<br>
+                        });<br><br>
+
+                        const errorDiv = document.getElementById('error');<br>
+                        if (res.ok) {<br>
+                            const { token } = await res.json();<br>
+                            localStorage.setItem('token', token);<br>
+                            errorDiv.textContent = 'Login successful!';<br>
+                            errorDiv.style.color = 'green';<br>
+                        } else {<br>
+                            const error = await res.json();<br>
+                            errorDiv.textContent = 'Login failed: ' + error.msg;<br>
+                            errorDiv.style.color = 'red';<br>
+                        }<br>
+                    });<br>
+                &lt;/script&gt;<br>
+            &lt;/body&gt;<br>
+            &lt;/html&gt;
+        </code>
+
+        <h3 id="register-page">3.2 Register Page</h3>
+        <p>Here is the HTML structure for the register page:</p>
+        <code>
+            &lt;!DOCTYPE html&gt;<br>
+            &lt;html lang="en"&gt;<br>
+            &lt;head&gt;<br>
+                &lt;meta charset="UTF-8"&gt;<br>
+                &lt;title&gt;Register&lt;/title&gt;<br>
+                &lt;style&gt;<br>
+                    /* Add your CSS styling here */<br>
+                &lt;/style&gt;<br>
+            &lt;/head&gt;<br>
+            &lt;body&gt;<br>
+                &lt;div class="container"&gt;<br>
+                    &lt;h1&gt;Register&lt;/h1&gt;<br>
+                    &lt;form id="registerForm"&gt;<br>
+                        &lt;label for="username"&gt;Username:&lt;/label&gt;<br>
+                        &lt;input type="text" id="username" name="username" required&gt;<br>
+                        &lt;br&gt;<br>
+                        &lt;label for="password"&gt;Password:&lt;/label&gt;<br>
+                        &lt;input type="password" id="password" name="password" required&gt;<br>
+                        &lt;br&gt;<br>
+                        &lt;button type="submit"&gt;Register&lt;/button&gt;<br>
+                        &lt;div id="error" class="error"&gt;&lt;/div&gt;<br>
+                    &lt;/form&gt;<br>
+                &lt;/div&gt;<br>
+                &lt;script&gt;<br>
+                    document.getElementById('registerForm').addEventListener('submit', async (e) => {<br>
+                        e.preventDefault();<br>
+                        const username = document.getElementById('username').value;<br>
+                        const password = document.getElementById('password').value;<br><br>
+
+                        const res = await fetch('/api/auth/register', {<br>
+                            method: 'POST',<br>
+                            headers: { 'Content-Type': 'application/json' },<br>
+                            body: JSON.stringify({ username, password }),<br>
+                        });<br><br>
+
+                        const errorDiv = document.getElementById('error');<br>
+                        if (res.ok) {<br>
+                            errorDiv.textContent = 'Registration successful!';<br>
+                            errorDiv.style.color = 'green';<br>
+                        } else {<br>
+                            const error = await res.json();<br>
+                            errorDiv.textContent = 'Registration failed: ' + error.msg;<br>
+                            errorDiv.style.color = 'red';<br>
+                        }<br>
+                    });<br>
+                &lt;/script&gt;<br>
+            &lt;/body&gt;<br>
+            &lt;/html&gt;
+        </code>
+
+        <h3 id="index-page">3.3 Index Page</h3>
+        <p>Here is the HTML structure for the index page:</p>
+        <code>
+            &lt;!DOCTYPE html&gt;<br>
+            &lt;html lang="en"&gt;<br>
+            &lt;head&gt;<br>
+                &lt;meta charset="UTF-8"&gt;<br>
+                &lt;title&gt;Secure Auth&lt;/title&gt;<br>
+                &lt;style&gt;<br>
+                    /* Add your CSS styling here */<br>
+                &lt;/style&gt;<br>
+            &lt;/head&gt;<br>
+            &lt;body&gt;<br>
+                &lt;div class="container"&gt;<br>
+                    &lt;h1&gt;Welcome to Secure Auth App&lt;/h1&gt;<br>
+                    &lt;a href="register.html"&gt;Register&lt;/a&gt;<br>
+                    &lt;a href="login.html"&gt;Login&lt;/a&gt;<br>
+                &lt;/div&gt;<br>
+            &lt;/body&gt;<br>
+            &lt;/html&gt;
+        </code>
+
+        <h2 id="styling">4. Styling</h2>
+        <p>Here is a sample CSS styling for the project:</p>
+        <code>
+            body {<br>
+                font-family: Arial, sans-serif;<br>
+                background-color: #f4f4f4;<br>
+                margin: 0;<br>
+                padding: 20px;<br>
+                display: flex;<br>
+                flex-direction: column;<br>
+                align-items: center;<br>
+            }<br><br>
+
+            .container {<br>
+                max-width: 800px;<br>
+                background-color: #fff;<br>
+                padding: 20px;<br>
+                border-radius: 5px;<br>
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);<br>
+                margin-bottom: 20px;<br>
+            }<br><br>
+
+            h1, h2, h3 {<br>
+                color: #333;<br>
+            }<br><br>
+
+            p {<br>
+                color: #555;<br>
+                line-height: 1.6;<br>
+            }<br><br>
+
+            code {<br>
+                display: block;<br>
+                background-color: #f9f9f9;<br>
+                padding: 10px;<br>
+                border: 1px solid #ddd;<br>
+                border-radius: 5px;<br>
+                margin: 10px 0;<br>
+                white-space: pre-wrap;<br>
+            }<br><br>
+
+            a {<br>
+                display: inline-block;<br>
+                margin-top: 10px;<br>
+                padding: 10px 20px;<br>
+                background-color: #007bff;<br>
+                color: #fff;<br>
+                text-decoration: none;<br>
+                border-radius: 5px;<br>
+            }<br><br>
+
+            a:hover {<br>
+                background-color: #0056b3;<br>
+            }
+        </code>
+
+        <h2 id="running-the-project">5. Running the Project</h2>
+        <p>To run the project, follow these steps:</p>
+        <ol>
+            <li>Create a <code>.env</code> file in the root directory with the following content:</li>
+            <code>
+                MONGO_URI=your_mongodb_connection_string<br>
+                JWT_SECRET=your_jwt_secret
+            </code>
+            <li>Start the server:</li>
+            <code>
+                node server.js
+            </code>
+            <li>Open your browser and navigate to <code>http://localhost:5000</code>.</li>
+        </ol>
+
+        <h2 id="conclusion">6. Conclusion</h2>
+        <p>This documentation provided an overview of the Secure Auth project, including the project setup, backend and frontend implementation, styling, and how to run the project. By following these steps, other developers can implement a similar secure authentication system in their own projects.</p>
+    </div>
+</body>
+</html>
